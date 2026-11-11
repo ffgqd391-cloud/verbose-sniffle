@@ -20,16 +20,15 @@ jobs:
           ndk-version: r21e
           local-cache: true
 
-      - name: Extract mod source
-        run: |
-          unzip -o NewMod-Layout-Style.zip -d modsrc
-          echo "--- makefiles found ---"
-          find modsrc -name "Android.mk" -o -name "Application.mk"
-
       - name: Locate JNI project root
         id: find_jni
         run: |
-          JNI_DIR=$(dirname "$(find modsrc -name 'Android.mk' | head -n 1)")
+          echo "--- makefiles found ---"
+          find . -name "Android.mk" -not -path "*/build/*"
+          JNI_DIR=$(dirname "$(find . -name 'Android.mk' -not -path '*/build/*' | head -n 1)")
+          if [ -z "$JNI_DIR" ] || [ "$JNI_DIR" = "." ]; then
+            echo "No Android.mk found — aborting"; exit 1
+          fi
           echo "jni_dir=$JNI_DIR" >> $GITHUB_OUTPUT
 
       - name: Build with ndk-build
