@@ -1,0 +1,34 @@
+name: Build Native Lib
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup_ndk
+        with:
+          ndk-version: r21e
+          local-cache: true
+
+      - name: Build with ndk-build
+        run: |
+          ${{ steps.setup_ndk.outputs.ndk-path }}/ndk-build \
+            NDK_PROJECT_PATH=. \
+            APP_BUILD_SCRIPT=./Android.mk \
+            NDK_APPLICATION_MK=./Application.mk
+
+      - name: Upload .so artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-libs
+          path: libs/
