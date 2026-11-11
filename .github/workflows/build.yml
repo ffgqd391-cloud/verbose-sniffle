@@ -13,6 +13,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # r21e still supports everything except gnustl.
+      # If the build later fails on gnustl-only symbols (__gnu_cxx, std::__1),
+      # swap ndk-version to r17c and drop the APP_STL override below.
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         id: setup_ndk
@@ -31,6 +34,15 @@ jobs:
           fi
           echo "jni_dir=$JNI_DIR" >> $GITHUB_OUTPUT
 
+      # Belt-and-suspenders: also rewrite gnustl in the file itself,
+      # in case the makefile reads APP_STL before the command-line var lands.
+      - name: Patch Application.mk STL
+        run: |
+          sed -i 's/gnustl_static/c++_static/g; s/gnustl_shared/c++_shared/g' \
+            ${{ steps.find_jni.outputs.jni_dir }}/Application.mk
+          echo "--- patched STL line ---"
+          grep -n "APP_STL" ${{ steps.find_jni.outputs.jni_dir }}/Application.mk || true
+
       - name: Build with ndk-build
         run: |
           ${{ steps.setup_ndk.outputs.ndk-path }}/ndk-build \
@@ -38,10 +50,12 @@ jobs:
             APP_BUILD_SCRIPT=${{ steps.find_jni.outputs.jni_dir }}/Android.mk \
             NDK_APPLICATION_MK=${{ steps.find_jni.outputs.jni_dir }}/Application.mk \
             APP_PLATFORM=android-21 \
-            APP_ABI="arm64-v8a armeabi-v7a"
+            APP_ABI="arm64-v8a armeabi-v7a" \
+            APP_STL=c++_static
 
       - name: Upload .so artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ob25-native-libs
           path: ${{ steps.find_jni.outputs.jni_dir }}/libs/
+          if-no-files-found: error
